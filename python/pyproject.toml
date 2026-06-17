@@ -18,6 +18,10 @@ classifiers = [
   "Typing :: Typed",
 ]
 
+[project.optional-dependencies]
+# The sync client + typed models are stdlib-only; the async client needs httpx.
+async = ["httpx>=0.27"]
+
 [project.urls]
 Homepage = "https://metagraph.sh"
 Repository = "https://github.com/JSONbored/metagraphed"

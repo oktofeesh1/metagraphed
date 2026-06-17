@@ -14,7 +14,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from importlib.metadata import PackageNotFoundError, version as _package_version
-from typing import Any, Iterator, Mapping, Optional, Sequence
+from typing import Any, Iterator, List, Mapping, Optional, Sequence
 
 # Single source of truth = the package metadata (pyproject.toml `version`, which
 # release-please bumps); read it at runtime so the User-Agent can never disagree
@@ -207,6 +207,54 @@ def metagraphed_paginate(
             return
 
 
+def collection_rows(page: Any) -> List[Any]:
+    """Extract a list-endpoint page's rows. The API nests rows under
+    ``data[<collection>]`` where ``meta.pagination.collection`` names the key
+    (e.g. ``data.subnets`` for ``/api/v1/subnets``); falls back to ``data``
+    itself when it's already a list. Returns ``[]`` for anything else."""
+    if not isinstance(page, dict):
+        return []
+    data = page.get("data")
+    if isinstance(data, list):
+        return data
+    meta = page.get("meta")
+    pagination = meta.get("pagination") if isinstance(meta, dict) else None
+    collection = pagination.get("collection") if isinstance(pagination, dict) else None
+    if collection and isinstance(data, dict):
+        rows = data.get(collection)
+        if isinstance(rows, list):
+            return rows
+    return []
+
+
+def metagraphed_fetch_all(
+    path: str,
+    *,
+    base_url: str = DEFAULT_BASE_URL,
+    path_params: Optional[Mapping[str, Any]] = None,
+    query: Optional[Mapping[str, Any]] = None,
+    headers: Optional[Mapping[str, str]] = None,
+    timeout: float = 30.0,
+    retries: int = 0,
+) -> List[Any]:
+    """Eagerly collect every row of a list endpoint across all pages.
+
+    Convenience over :func:`metagraphed_paginate` for the common "give me all of
+    them" case: concatenates each page's rows (see :func:`collection_rows`)."""
+    rows: List[Any] = []
+    for page in metagraphed_paginate(
+        path,
+        base_url=base_url,
+        path_params=path_params,
+        query=query,
+        headers=headers,
+        timeout=timeout,
+        retries=retries,
+    ):
+        rows.extend(collection_rows(page))
+    return rows
+
+
 def metagraphed_rpc(
     network: str,
     method: str,
@@ -343,3 +391,58 @@ class MetagraphedClient:
             timeout=self.timeout,
             request_id=request_id,
         )
+
+    def fetch_all(
+        self,
+        path: str,
+        *,
+        path_params: Optional[Mapping[str, Any]] = None,
+        query: Optional[Mapping[str, Any]] = None,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> List[Any]:
+        """Collect every ``data`` row of a list endpoint across all pages."""
+        return metagraphed_fetch_all(
+            path,
+            base_url=self.base_url,
+            path_params=path_params,
+            query=query,
+            headers=headers,
+            timeout=self.timeout,
+            retries=self.retries,
+        )
+
+    # Convenience wrappers over the canonical list/detail routes. Each returns
+    # the raw ``{ ok, data, meta }`` envelope; pair with the typed models in
+    # ``metagraphed.models`` (e.g. ``Subnet.from_list(client.fetch_all(...))``).
+    def subnets(self, **query: Any) -> Any:
+        """GET /api/v1/subnets (one page — pass ``limit``/``cursor``, or use
+        :meth:`fetch_all`)."""
+        return self.fetch("/api/v1/subnets", query=query)
+
+    def get_subnet(self, netuid: int) -> Any:
+        """GET /api/v1/subnets/{netuid}."""
+        return self.fetch("/api/v1/subnets/{netuid}", path_params={"netuid": netuid})
+
+    def providers(self, **query: Any) -> Any:
+        """GET /api/v1/providers."""
+        return self.fetch("/api/v1/providers", query=query)
+
+    def get_provider(self, slug: str) -> Any:
+        """GET /api/v1/providers/{slug}."""
+        return self.fetch("/api/v1/providers/{slug}", path_params={"slug": slug})
+
+    def surfaces(self, **query: Any) -> Any:
+        """GET /api/v1/surfaces."""
+        return self.fetch("/api/v1/surfaces", query=query)
+
+    def endpoints(self, **query: Any) -> Any:
+        """GET /api/v1/endpoints."""
+        return self.fetch("/api/v1/endpoints", query=query)
+
+    def health(self) -> Any:
+        """GET /api/v1/health."""
+        return self.fetch("/api/v1/health")
+
+    def agent_catalog(self, **query: Any) -> Any:
+        """GET /api/v1/agent-catalog."""
+        return self.fetch("/api/v1/agent-catalog", query=query)
