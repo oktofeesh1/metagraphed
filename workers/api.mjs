@@ -290,7 +290,10 @@ export async function handleRequest(request, env = {}, ctx = {}) {
   // method gate); `/api/*` is run_worker_first so these never fall through to
   // the static assets. Read-only, content-negotiated, edge-cached.
   if (url.pathname.startsWith("/api/v1/feeds/")) {
-    return handleFeedRequest(request, env, url, { readArtifact });
+    return handleFeedRequest(request, env, url, {
+      readArtifact,
+      errorResponse,
+    });
   }
 
   // Embeddable SVG readiness badges (#744) — /api/v1/{subnets/{netuid}|
