@@ -2300,9 +2300,11 @@ async function handleUptime(request, env, netuid, url) {
      LIMIT ?`,
     [netuid, cutoff, MAX_UPTIME_ROWS],
   );
+  const healthMeta = await readHealthMetaKv(env);
   const data = formatUptime({
     netuid,
     window: windowParam,
+    observedAt: healthMeta?.last_run_at || null,
     rows,
     now: new Date().toISOString(),
   });
@@ -2313,7 +2315,7 @@ async function handleUptime(request, env, netuid, url) {
       meta: await analyticsMeta(
         env,
         `/metagraph/subnets/${netuid}/uptime.json`,
-        null,
+        data.observed_at,
       ),
     },
     "short",
