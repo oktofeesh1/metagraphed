@@ -72,7 +72,7 @@ const MCP_LATEST_PROTOCOL = MCP_PROTOCOL_VERSIONS[0];
 //   - change or remove a tool's I/O       → MAJOR
 //   - behavioral-only fix (no I/O change) → PATCH
 // Reported in serverInfo.version (initialize) + the generated server-card.json.
-export const MCP_SERVER_VERSION = "1.2.0";
+export const MCP_SERVER_VERSION = "1.3.0";
 
 export const MCP_SERVER_INFO = {
   name: "metagraphed",
@@ -409,6 +409,41 @@ function clampLimit(value, fallback, max) {
   return Math.min(max, Math.floor(value));
 }
 
+// Fields list_subnets can sort by. Kept in one place so the inputSchema enum and
+// the runtime validation can't drift.
+const LIST_SUBNETS_SORT_FIELDS = [
+  "netuid",
+  "integration_readiness",
+  "surface_count",
+  "name",
+];
+const LIST_SUBNETS_ORDERS = ["asc", "desc"];
+
+function subnetSortValue(subnet, field) {
+  const value = subnet[field];
+  // Only numbers/strings are comparable; anything else (missing field) sorts as
+  // null so the comparator can place it last.
+  return typeof value === "number" || typeof value === "string" ? value : null;
+}
+
+// Order subnets by a sortable field. null/undefined values sort LAST regardless
+// of direction (so "most integration_readiness, desc" never surfaces unscored
+// subnets first); ties break by netuid for a stable, deterministic page.
+function sortSubnets(rows, field, order) {
+  const dir = order === "desc" ? -1 : 1;
+  return [...rows].sort((a, b) => {
+    const av = subnetSortValue(a, field);
+    const bv = subnetSortValue(b, field);
+    if (av === null || bv === null) {
+      if (av === null && bv === null) return a.netuid - b.netuid;
+      return av === null ? 1 : -1;
+    }
+    const cmp =
+      typeof av === "number" ? av - bv : String(av).localeCompare(String(bv));
+    return cmp !== 0 ? cmp * dir : a.netuid - b.netuid;
+  });
+}
+
 // A search.json document → keywordScore shape: title/slug are identity; subtitle
 // and tokens (which already fold in categories/service kinds) are recall-only.
 function scoreDocument(doc, terms) {
@@ -599,6 +634,19 @@ export const MCP_TOOLS = [
           minimum: 0,
           maximum: 100,
         },
+        sort: {
+          type: "string",
+          enum: LIST_SUBNETS_SORT_FIELDS,
+          description:
+            "Order the (filtered) list by this field before paging — e.g. " +
+            "sort by integration_readiness for the most integration-ready " +
+            "subnets. Default: registry source order. Unscored subnets sort last.",
+        },
+        order: {
+          type: "string",
+          enum: LIST_SUBNETS_ORDERS,
+          description: "Sort direction when `sort` is set (default 'asc').",
+        },
       },
       additionalProperties: false,
     },
@@ -650,11 +698,14 @@ export const MCP_TOOLS = [
         return true;
       });
       const total = filtered.length;
+      const sort = optionalEnum(args, "sort", LIST_SUBNETS_SORT_FIELDS);
+      const order = optionalEnum(args, "order", LIST_SUBNETS_ORDERS) || "asc";
+      const ordered = sort ? sortSubnets(filtered, sort, order) : filtered;
       const offset = Number.isFinite(args?.offset)
         ? Math.max(0, Math.floor(args.offset))
         : 0;
       const limit = clampLimit(args?.limit, 50, 100);
-      const page = filtered.slice(offset, offset + limit).map((subnet) => ({
+      const page = ordered.slice(offset, offset + limit).map((subnet) => ({
         netuid: subnet.netuid,
         slug: subnet.slug ?? null,
         title: subnet.name ?? null,
@@ -676,6 +727,10 @@ export const MCP_TOOLS = [
         returned: page.length,
         offset,
         limit,
+        // Echo the applied ordering (null when paging in source order) so an
+        // agent can confirm what it got, mirroring the REST list meta.
+        sort: sort ?? null,
+        order: sort ? order : null,
         next_offset: nextOffset,
         subnets: page,
       };
