@@ -14,33 +14,24 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: refresh-metagraph
   cancel-in-progress: false
 
 jobs:
-  refresh:
+  fetch:
     runs-on: ubuntu-latest
     timeout-minutes: 30 # one get_all_metagraphs_info call + per-subnet storage reads
     steps:
       - name: Checkout
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
-      # No `cache: npm` here on purpose: this workflow holds Cloudflare + signing
-      # secrets, so it doesn't consume a shared npm cache another workflow could poison.
-      - name: Setup Node
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
-        with:
-          node-version: 22.23.0
-
       - name: Setup uv
-        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
-
-      - name: Install
-        run: npm ci
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
 
       # First-party chain-direct fetch (pinned bittensor, matching sync-subnets):
       # get_all_metagraphs_info for the per-UID core + SubtensorModule.ValidatorTrust
@@ -48,6 +39,41 @@ jobs:
       # Taostats source (#1348). No Taostats, no API key.
       - name: Fetch per-UID metagraph (Bittensor SDK)
         run: uvx --from bittensor==10.4.0 python scripts/fetch-metagraph-native.py
+
+      - name: Upload unsigned neuron snapshot
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: metagraph-neurons-unsigned
+          path: dist/metagraph-neurons.json
+          if-no-files-found: error
+          retention-days: 1
+
+  sign-and-stage:
+    needs: fetch
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      # Keep the secret-bearing job in a fresh workspace. The unpinned PyPI
+      # execution boundary above can only pass the JSON data artifact forward, not
+      # mutated repository scripts, shell startup files, or node_modules.
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22.23.0
+
+      - name: Install
+        run: npm ci
+
+      - name: Download unsigned neuron snapshot
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: metagraph-neurons-unsigned
+          path: dist
 
       - name: Sign staged neuron snapshot
         run: node scripts/sign-staged-neurons.mjs dist/metagraph-neurons.json
@@ -62,11 +88,19 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+  notify-on-failure:
+    needs: [fetch, sign-and-stage]
+    if: ${{ always() && (needs.fetch.result == 'failure' || needs.sign-and-stage.result == 'failure') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
       - name: Notify on failure
-        if: failure() && env.METAGRAPH_ALERT_WEBHOOK_URL != ''
         env:
           METAGRAPH_ALERT_WEBHOOK_URL: ${{ secrets.METAGRAPH_ALERT_WEBHOOK_URL }}
         run: |
+          if [ -z "$METAGRAPH_ALERT_WEBHOOK_URL" ]; then
+            exit 0
+          fi
           curl -fsS -X POST "$METAGRAPH_ALERT_WEBHOOK_URL" \
             -H 'content-type: application/json' \
-            -d '{"content":"🔴 metagraphed refresh-metagraph FAILED — the per-UID neurons D1 tier may go stale."}' || true
+            -d '{"content":"🔴 metagraphed refresh-metagraph FAILED — the per-UID neurons D1 tier may go stale."}'
