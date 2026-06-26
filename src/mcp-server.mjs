@@ -1224,8 +1224,8 @@ export const MCP_TOOLS = [
       "block per day. Optionally filter to one subnet (netuid), a date range (from/to " +
       "as YYYY-MM-DD), and page with limit (1-1000, default 100) / offset. Newest day " +
       "first. Useful for understanding how active a wallet has been over time. Note: " +
-      "the rollup is hotkey-attributed only — a coldkey-only address returns zero days " +
-      "even if it has events in get_account_events.",
+      "the rollup is hotkey-attributed only — a delegate-only SS58 address returns " +
+      "zero days even if it has events in get_account_events.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1286,7 +1286,7 @@ export const MCP_TOOLS = [
     description:
       "Fetch the extrinsics (transactions) signed by one account by its SS58 address, " +
       "newest first: block, extrinsic index, hash, call module and function, success " +
-      "flag, and fee. Matched by the extrinsic signer only (not the hotkey/coldkey " +
+      "flag, and fee. Matched by the extrinsic signer only (not the hotkey or coldkey " +
       "union used by get_account_events). Page with limit (1-1000, default 100) / " +
       "offset. Useful for seeing exactly which extrinsics a wallet submitted.",
     inputSchema: {
