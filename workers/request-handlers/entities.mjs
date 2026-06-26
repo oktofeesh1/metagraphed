@@ -638,7 +638,7 @@ export async function handleBlock(request, env, ref) {
   const sql = isHash
     ? `SELECT ${BLOCK_READ_COLUMNS} FROM blocks WHERE block_hash = ? LIMIT 1`
     : `SELECT ${BLOCK_READ_COLUMNS} FROM blocks WHERE block_number = ? LIMIT 1`;
-  const param = isHash ? ref : Number(ref);
+  const param = isHash ? ref.toLowerCase() : Number(ref);
   const rows = await d1All(env, sql, [param]);
   // prev/next chain-walk neighbors (#1853): one bounded query for the nearest
   // STORED block numbers around the resolved height (skips pruned gaps; null at
@@ -688,7 +688,7 @@ export async function handleBlockExtrinsics(request, env, ref, url) {
     const blockRows = await d1All(
       env,
       `SELECT block_number FROM blocks WHERE block_hash = ? LIMIT 1`,
-      [ref],
+      [ref.toLowerCase()],
     );
     blockNumber = blockRows[0]?.block_number ?? null;
   }
@@ -732,7 +732,7 @@ export async function handleBlockEvents(request, env, ref, url) {
     const blockRows = await d1All(
       env,
       `SELECT block_number FROM blocks WHERE block_hash = ? LIMIT 1`,
-      [ref],
+      [ref.toLowerCase()],
     );
     blockNumber = blockRows[0]?.block_number ?? null;
   }
@@ -874,7 +874,7 @@ export async function handleExtrinsic(request, env, ref) {
     rows = await d1All(
       env,
       `SELECT ${EXTRINSIC_READ_COLUMNS} FROM extrinsics WHERE extrinsic_hash = ? ORDER BY block_number DESC, extrinsic_index DESC LIMIT 1`,
-      [ref],
+      [ref.toLowerCase()],
     );
   } else {
     // Composite "<block>-<index>": coerce both halves; a non-finite half is a
