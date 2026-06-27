@@ -64,6 +64,7 @@ import {
   handleSubnetEvents,
   handleNeuronHistory,
   handleSubnetHistory,
+  handleSubnetConcentration,
   handleAccount,
   handleAccountHistory,
   handleAccountBalance,
@@ -224,6 +225,7 @@ import {
   SUBNET_VALIDATORS_PATH_PATTERN,
   SUBNET_EVENTS_PATH_PATTERN,
   TRAJECTORY_PATH_PATTERN,
+  SUBNET_CONCENTRATION_PATH_PATTERN,
   TRENDS_PATH_PATTERN,
   UPTIME_PATH_PATTERN,
   WEBHOOK_SUBSCRIPTION_TOKEN_HEADER,
@@ -1084,6 +1086,21 @@ export async function handleRequest(request, env = {}, ctx = {}) {
     if (uptimeMatch) {
       return withEdgeCache(request, ctx, env, "uptime", () =>
         handleUptime(request, env, Number(uptimeMatch[1]), resolved.url),
+      );
+    }
+    const concentrationMatch = SUBNET_CONCENTRATION_PATH_PATTERN.exec(
+      resolved.url.pathname,
+    );
+    if (concentrationMatch) {
+      // Per-UID range read over the neurons tier, deterministic per cron snapshot
+      // — edge-cache on last_run_at like the sibling metagraph routes.
+      return withEdgeCache(request, ctx, env, "subnet-concentration", () =>
+        handleSubnetConcentration(
+          request,
+          env,
+          Number(concentrationMatch[1]),
+          resolved.url,
+        ),
       );
     }
     // Per-UID metagraph (#1304/#1305): computed live from the neurons D1 tier.

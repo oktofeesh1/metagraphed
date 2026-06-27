@@ -68,6 +68,7 @@ import {
   buildExtrinsic,
   buildExtrinsicFeed,
 } from "../../src/extrinsics.mjs";
+import { buildConcentration } from "../../src/concentration.mjs";
 
 const MAX_BLOCK_COUNT_FILTER = 1_000_000;
 
@@ -219,6 +220,34 @@ export async function handleSubnetHistory(request, env, netuid, url) {
         env,
         `/metagraph/subnets/${netuid}/history.json`,
         null,
+      ),
+    },
+    "short",
+  );
+}
+
+// GET /api/v1/subnets/{netuid}/concentration: stake & emission decentralization
+// metrics (Gini, HHI, Nakamoto coefficient, top-percentile shares, entropy) over
+// the subnet's live per-UID distribution (#2106). Computed from the neurons D1
+// tier; a cold/absent store or empty subnet → 200 with stake/emission:null
+// (schema-stable, never 404), mirroring the sibling metagraph/history routes.
+export async function handleSubnetConcentration(request, env, netuid, url) {
+  const validationError = validateQueryParams(url, []);
+  if (validationError) return analyticsQueryError(validationError);
+  const rows = await d1All(
+    env,
+    "SELECT stake_tao, emission_tao, captured_at FROM neurons WHERE netuid = ?",
+    [netuid],
+  );
+  const data = buildConcentration(rows, netuid);
+  return envelopeResponse(
+    request,
+    {
+      data,
+      meta: await metagraphMeta(
+        env,
+        `/metagraph/subnets/${netuid}/concentration.json`,
+        data.captured_at,
       ),
     },
     "short",

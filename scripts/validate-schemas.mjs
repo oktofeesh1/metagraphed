@@ -26,6 +26,7 @@ const COMPUTED_ARTIFACTS = new Set([
   "health-percentiles",
   "health-incidents",
   "subnet-trajectory",
+  "subnet-concentration",
   "subnet-uptime",
   "subnet-metagraph",
   "subnet-neuron",

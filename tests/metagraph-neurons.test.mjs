@@ -206,6 +206,17 @@ describe("metagraph routes (#1304/#1305) via the Worker", () => {
     assert.equal(body.data.neurons[0].uid, 0);
   });
 
+  test("GET /subnets/{n}/concentration computes stake + emission metrics", async () => {
+    const { res, body } = await getJson("/api/v1/subnets/7/concentration", env);
+    assert.equal(res.status, 200);
+    assert.equal(body.data.netuid, 7);
+    assert.equal(body.data.neuron_count, 2);
+    assert.equal(body.data.stake.holders, 2);
+    assert.equal(body.data.emission.holders, 2);
+    assert.equal(typeof body.data.stake.gini, "number");
+    assert.equal(typeof body.data.stake.nakamoto_coefficient, "number");
+  });
+
   test("GET /subnets/{n}/validators returns only validators", async () => {
     const { body } = await getJson("/api/v1/subnets/7/validators", env);
     assert.equal(body.data.validator_count, 1);

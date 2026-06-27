@@ -359,6 +359,13 @@
     },
     {
       "contract_version": "2026-06-06.1",
+      "id": "subnet-concentration",
+      "path": "/metagraph/subnets/{netuid}/concentration.json",
+      "schema_ref": "#/components/schemas/SubnetConcentrationArtifact",
+      "storage_tier": "r2"
+    },
+    {
+      "contract_version": "2026-06-06.1",
       "id": "subnet-metagraph",
       "path": "/metagraph/subnets/{netuid}/metagraph.json",
       "schema_ref": "#/components/schemas/SubnetMetagraphArtifact",
@@ -4091,6 +4098,18 @@
       "id": "subnet-trajectory",
       "method": "GET",
       "path": "/api/v1/subnets/{netuid}/trajectory",
+      "public": true,
+      "query_collection": null,
+      "query_filter_names": [],
+      "query_parameters": []
+    },
+    {
+      "artifact_path": "/metagraph/subnets/{netuid}/concentration.json",
+      "cache": "short",
+      "description": "Fetch stake & emission concentration metrics (Gini, HHI, Nakamoto coefficient, top-percentile shares, entropy) for one subnet's per-UID distribution (computed live from the neurons D1 tier).",
+      "id": "subnet-concentration",
+      "method": "GET",
+      "path": "/api/v1/subnets/{netuid}/concentration",
       "public": true,
       "query_collection": null,
       "query_filter_names": [],

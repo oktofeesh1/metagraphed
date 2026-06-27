@@ -10192,6 +10192,195 @@
       "SubnetCandidatesArtifact": {
         "$ref": "#/components/schemas/CandidatesArtifact"
       },
+      "SubnetConcentrationArtifact": {
+        "additionalProperties": true,
+        "description": "Stake & emission concentration / decentralization metrics over one subnet's per-UID distribution, computed live from the neurons D1 tier.",
+        "properties": {
+          "captured_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "emission": {
+            "additionalProperties": true,
+            "properties": {
+              "entropy": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "entropy_normalized": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "gini": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "hhi": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "hhi_normalized": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "holders": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "nakamoto_coefficient": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "top_10pct_share": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "top_1pct_share": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "top_20pct_share": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "top_5pct_share": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "total": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "netuid": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "neuron_count": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "schema_version": {
+            "type": "integer"
+          },
+          "stake": {
+            "additionalProperties": true,
+            "properties": {
+              "entropy": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "entropy_normalized": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "gini": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "hhi": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "hhi_normalized": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "holders": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "nakamoto_coefficient": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "top_10pct_share": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "top_1pct_share": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "top_20pct_share": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "top_5pct_share": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "total": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "schema_version",
+          "netuid",
+          "neuron_count",
+          "stake",
+          "emission"
+        ],
+        "type": "object"
+      },
       "SubnetDetail": {
         "additionalProperties": false,
         "properties": {

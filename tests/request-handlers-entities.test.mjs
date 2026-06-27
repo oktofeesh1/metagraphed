@@ -12,6 +12,7 @@ import {
   handleSubnetValidators,
   handleNeuronHistory,
   handleSubnetHistory,
+  handleSubnetConcentration,
   handleAccount,
   handleAccountEvents,
   handleAccountHistory,
@@ -692,6 +693,66 @@ describe("handleSubnetHistory", () => {
     );
     const body = await errorJson(res);
     assert.equal(body.meta.parameter, "window");
+  });
+});
+
+describe("handleSubnetConcentration", () => {
+  test("rejects an unsupported query param with 400", async () => {
+    const res = await handleSubnetConcentration(
+      req(`/api/v1/subnets/${NETUID}/concentration`),
+      emptyEnv(),
+      NETUID,
+      url(`/api/v1/subnets/${NETUID}/concentration?window=7d`),
+    );
+    await errorJson(res);
+  });
+
+  test("returns schema-stable null blocks on cold D1", async () => {
+    const body = await assertColdSchema(
+      handleSubnetConcentration,
+      req(`/api/v1/subnets/${NETUID}/concentration`),
+      emptyEnv(),
+      NETUID,
+      url(`/api/v1/subnets/${NETUID}/concentration`),
+    );
+    assert.equal(body.data.netuid, NETUID);
+    assert.equal(body.data.neuron_count, 0);
+    assert.equal(body.data.stake, null);
+    assert.equal(body.data.emission, null);
+  });
+
+  test("happy path computes stake + emission concentration over the neurons tier", async () => {
+    const { env, captures } = dbWith({
+      neurons: [
+        neuronRow({ stake_tao: 100, emission_tao: 2 }),
+        neuronRow({ uid: 1, stake_tao: 50, emission_tao: 1 }),
+      ],
+    });
+    const body = await json(
+      await handleSubnetConcentration(
+        req(`/api/v1/subnets/${NETUID}/concentration`),
+        env,
+        NETUID,
+        url(`/api/v1/subnets/${NETUID}/concentration`),
+      ),
+    );
+    assert.equal(body.data.netuid, NETUID);
+    assert.equal(body.data.neuron_count, 2);
+    assert.equal(body.data.stake.holders, 2);
+    assert.equal(body.data.stake.total, 150);
+    assert.equal(body.data.emission.holders, 2);
+    assert.ok(body.data.stake.gini > 0);
+    assert.equal(body.data.stake.nakamoto_coefficient, 1); // top holder > 50%
+    // Bound to the netuid via the neurons-tier read.
+    assert.ok(
+      captures.sql.some((s) => /FROM neurons WHERE netuid = \?/.test(s)),
+    );
+    assert.equal(
+      captures.params[
+        captures.sql.findIndex((s) => /FROM neurons WHERE netuid = \?/.test(s))
+      ][0],
+      NETUID,
+    );
   });
 });
 
