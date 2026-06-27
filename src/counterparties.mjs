@@ -75,7 +75,8 @@ export function buildCounterparties(rows, ss58, { limit = 20 } = {}) {
     entry.sent += sent;
     entry.received += received;
     entry.count += 1;
-    const block = row?.block_number;
+    // `row` is non-null here (it produced a party), so no optional chain needed.
+    const block = row.block_number;
     if (
       typeof block === "number" &&
       (entry.lastBlock == null || block > entry.lastBlock)
@@ -100,7 +101,8 @@ export function buildCounterparties(rows, ss58, { limit = 20 } = {}) {
       if (volumeDelta !== 0) return volumeDelta;
       const blockDelta = (b.last_block ?? 0) - (a.last_block ?? 0);
       if (blockDelta !== 0) return blockDelta;
-      return a.address < b.address ? -1 : a.address > b.address ? 1 : 0;
+      // Counterparties are distinct Map keys, so addresses are never equal here.
+      return a.address < b.address ? -1 : 1;
     });
 
   const cap = Math.max(1, Math.min(limit, 100));

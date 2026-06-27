@@ -103,3 +103,198 @@ describe("buildCounterparties", () => {
     assert.equal(data.counterparties.length, 10);
   });
 });
+
+describe("buildCounterparties — invariants", () => {
+  const ROWS = [
+    { hotkey: "ME", coldkey: "A", amount_tao: 100, block_number: 5 },
+    { hotkey: "A", coldkey: "ME", amount_tao: 40, block_number: 6 },
+    { hotkey: "B", coldkey: "ME", amount_tao: 25, block_number: 7 },
+    { hotkey: "ME", coldkey: "C", amount_tao: 10, block_number: 8 },
+    { hotkey: "ME", coldkey: "ME", amount_tao: 99, block_number: 9 }, // self (ignored)
+  ];
+
+  test("per-counterparty net = received − sent, and the rollup sums to the totals", () => {
+    const data = buildCounterparties(ROWS, ME, { limit: 100 });
+    let sumSent = 0;
+    let sumReceived = 0;
+    let sumCount = 0;
+    for (const cp of data.counterparties) {
+      // net is exactly received − sent (integer amounts → no rounding drift).
+      assert.equal(cp.net_tao, cp.received_tao - cp.sent_tao);
+      sumSent += cp.sent_tao;
+      sumReceived += cp.received_tao;
+      sumCount += cp.transfer_count;
+    }
+    // Σ per-counterparty == the summary totals (the rollup is self-consistent).
+    assert.equal(sumSent, data.total_sent_tao);
+    assert.equal(sumReceived, data.total_received_tao);
+    // Σ transfer_count == the involved (non-self) transfers.
+    assert.equal(sumCount, 4);
+    assert.equal(data.counterparty_count, 3);
+  });
+
+  test("the list is monotonically non-increasing by total volume", () => {
+    const data = buildCounterparties(
+      [
+        { hotkey: "ME", coldkey: "A", amount_tao: 5, block_number: 1 },
+        { hotkey: "ME", coldkey: "B", amount_tao: 50, block_number: 2 },
+        { hotkey: "ME", coldkey: "C", amount_tao: 500, block_number: 3 },
+      ],
+      ME,
+      { limit: 100 },
+    );
+    for (let i = 1; i < data.counterparties.length; i += 1) {
+      const prev = data.counterparties[i - 1];
+      const cur = data.counterparties[i];
+      assert.ok(
+        prev.sent_tao + prev.received_tao >= cur.sent_tao + cur.received_tao,
+      );
+    }
+  });
+
+  test("output amounts stay finite even when a sum overflows (defensive round guard)", () => {
+    // Two MAX_VALUE sends overflow to Infinity; round() clamps to 0 rather than
+    // leaking Infinity/NaN into the JSON — and exercises round's non-finite branch.
+    const data = buildCounterparties(
+      [
+        {
+          hotkey: "ME",
+          coldkey: "A",
+          amount_tao: Number.MAX_VALUE,
+          block_number: 1,
+        },
+        {
+          hotkey: "ME",
+          coldkey: "A",
+          amount_tao: Number.MAX_VALUE,
+          block_number: 2,
+        },
+      ],
+      ME,
+      { limit: 100 },
+    );
+    assert.equal(data.counterparties[0].sent_tao, 0);
+    assert.equal(data.total_sent_tao, 0);
+    assert.ok(Number.isFinite(data.counterparties[0].net_tao));
+  });
+});
+
+describe("buildCounterparties — regressions", () => {
+  test("equal-volume counterparties tie-break by last_block desc, then address asc", () => {
+    // Equal volume (10 each); A's last block is newer → A ranks first.
+    const byBlock = buildCounterparties(
+      [
+        { hotkey: "ME", coldkey: "A", amount_tao: 10, block_number: 20 },
+        { hotkey: "ME", coldkey: "B", amount_tao: 10, block_number: 10 },
+      ],
+      ME,
+      { limit: 100 },
+    );
+    assert.deepEqual(
+      byBlock.counterparties.map((c) => c.address),
+      ["A", "B"],
+    );
+    // Equal volume AND equal last_block → deterministic address-ascending order.
+    const byAddress = buildCounterparties(
+      [
+        { hotkey: "ME", coldkey: "B", amount_tao: 10, block_number: 5 },
+        { hotkey: "ME", coldkey: "A", amount_tao: 10, block_number: 5 },
+      ],
+      ME,
+      { limit: 100 },
+    );
+    assert.deepEqual(
+      byAddress.counterparties.map((c) => c.address),
+      ["A", "B"],
+    );
+  });
+
+  test("a transfer with an empty counterparty address is skipped", () => {
+    const data = buildCounterparties(
+      [
+        { hotkey: "ME", coldkey: "", amount_tao: 10, block_number: 1 }, // empty 'to'
+        { hotkey: "ME", coldkey: "A", amount_tao: 5, block_number: 2 },
+      ],
+      ME,
+      {},
+    );
+    assert.equal(data.counterparty_count, 1);
+    assert.equal(data.counterparties[0].address, "A");
+  });
+
+  test("a null block_number leaves last_block null", () => {
+    const data = buildCounterparties(
+      [{ hotkey: "ME", coldkey: "A", amount_tao: 5, block_number: null }],
+      ME,
+      {},
+    );
+    assert.equal(data.counterparties[0].last_block, null);
+  });
+
+  test("tie-break is deterministic when volumes tie AND last_block is null", () => {
+    // B is inserted first; A and B tie on volume with null last_block. Exercises
+    // both (last_block ?? 0) fallbacks and the address tiebreak's b<a (else) side,
+    // and the result is still address-ascending.
+    const data = buildCounterparties(
+      [
+        { hotkey: "ME", coldkey: "C", amount_tao: 10, block_number: null },
+        { hotkey: "ME", coldkey: "A", amount_tao: 10, block_number: null },
+        { hotkey: "ME", coldkey: "B", amount_tao: 10, block_number: null },
+      ],
+      ME,
+      { limit: 100 },
+    );
+    assert.deepEqual(
+      data.counterparties.map((c) => c.address),
+      ["A", "B", "C"],
+    );
+  });
+
+  test("a null / garbage row in the scan is skipped without throwing", () => {
+    const data = buildCounterparties(
+      [
+        null,
+        { hotkey: "ME", coldkey: "A", amount_tao: 5, block_number: 1 },
+        undefined,
+      ],
+      ME,
+      {},
+    );
+    assert.equal(data.counterparty_count, 1);
+    assert.equal(data.counterparties[0].address, "A");
+  });
+
+  test("a transfer missing the counterparty's address (either side) is skipped", () => {
+    const data = buildCounterparties(
+      [
+        { hotkey: "ME", coldkey: null, amount_tao: 10, block_number: 1 }, // send, null 'to'
+        { hotkey: null, coldkey: "ME", amount_tao: 5, block_number: 2 }, // receive, null 'from'
+        { hotkey: "ME", coldkey: "", amount_tao: 7, block_number: 3 }, // send, empty 'to'
+        { hotkey: "", coldkey: "ME", amount_tao: 9, block_number: 4 }, // receive, empty 'from'
+        { hotkey: "ME", coldkey: "A", amount_tao: 3, block_number: 5 },
+      ],
+      ME,
+      {},
+    );
+    assert.equal(data.counterparty_count, 1); // only A survives
+    assert.equal(data.counterparties[0].address, "A");
+  });
+
+  test("limit is defensively clamped to [1, 100]", () => {
+    const rows = Array.from({ length: 150 }, (_, i) => ({
+      hotkey: "ME",
+      coldkey: `P${i}`,
+      amount_tao: 150 - i,
+      block_number: i,
+    }));
+    // The handler clamps already; the builder re-clamps defensively.
+    assert.equal(
+      buildCounterparties(rows, ME, { limit: 0 }).counterparties.length,
+      1,
+    );
+    assert.equal(
+      buildCounterparties(rows, ME, { limit: 999 }).counterparties.length,
+      100,
+    );
+  });
+});
