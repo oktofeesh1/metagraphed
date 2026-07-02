@@ -12145,6 +12145,13 @@
               "null"
             ]
           },
+          "alpha_market_cap_tao": {
+            "description": "Derived market-cap proxy: alpha_price_tao multiplied by total_stake_tao, where total_stake_tao is the circulating-alpha proxy. Null when either input is missing.",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
           "alpha_out_pool": {
             "type": [
               "number",
@@ -12274,6 +12281,7 @@
           "registration_allowed",
           "registration_cost_tao",
           "alpha_price_tao",
+          "alpha_market_cap_tao",
           "total_stake_tao",
           "max_stake_tao",
           "tao_in_pool_tao",

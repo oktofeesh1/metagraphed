@@ -12167,6 +12167,13 @@
               "null"
             ]
           },
+          "alpha_market_cap_tao": {
+            "description": "Derived market-cap proxy: alpha_price_tao multiplied by total_stake_tao, where total_stake_tao is the circulating-alpha proxy. Null when either input is missing.",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
           "alpha_out_pool": {
             "type": [
               "number",
@@ -12296,6 +12303,7 @@
           "registration_allowed",
           "registration_cost_tao",
           "alpha_price_tao",
+          "alpha_market_cap_tao",
           "total_stake_tao",
           "max_stake_tao",
           "tao_in_pool_tao",
@@ -15508,7 +15516,7 @@
   "info": {
     "description": "Public, read-only API over canonical Metagraphed registry artifacts for Bittensor subnet interfaces. **No authentication** — every operation is an unauthenticated GET. Responses use a stable JSON envelope `{ ok, schema_version, data, meta }` (errors: `{ ok: false, error }`) and carry `ETag` + `Cache-Control` for conditional caching. Rate-limited per client. Multi-network: insert a `/{network}/` segment after `/api/v1/` (mainnet is the default — omit it) to read testnet data, e.g. `/api/v1/testnet/subnets`. Testnet exposes the subset of routes that have data; `/api/v1/lineage` tracks which testnet subnets have graduated.",
     "title": "Metagraphed API",
-    "version": "2026-06-30.14"
+    "version": "2026-07-01.1"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -21602,6 +21610,7 @@
             "required": false,
             "schema": {
               "enum": [
+                "alpha_market_cap_tao",
                 "alpha_price_tao",
                 "block",
                 "emission_share",
@@ -21649,6 +21658,7 @@
                     "subnets": [
                       {
                         "alpha_in_pool": 0.5,
+                        "alpha_market_cap_tao": 0.5,
                         "alpha_out_pool": 0.5,
                         "alpha_price_tao": 0.5,
                         "emission_share": 0.5,
@@ -21777,7 +21787,7 @@
             "description": "Unexpected backend error."
           }
         },
-        "summary": "List per-subnet validator and economic metrics (counts, stake, registration cost, alpha price, emission share, registration block height). Default order is emission share descending. Filter by netuid/registration_allowed, search by name/slug, and sort with `sort=<field>&order=asc|desc` — the two are separate parameters (e.g. `?sort=block&order=asc` or `?sort=total_stake_tao&order=desc`), NOT a combined `field:desc` token.",
+        "summary": "List per-subnet validator and economic metrics (counts, stake, registration cost, alpha price, alpha market-cap proxy, emission share, and registration block height). Default order is emission share descending. Filter by netuid/registration_allowed, search by name/slug, and sort with `sort=<field>&order=asc|desc` — the two are separate parameters (e.g. `?sort=alpha_market_cap_tao&order=desc` or `?sort=block&order=asc`), NOT a combined `field:desc` token.",
         "tags": [
           "subnets"
         ]
@@ -30577,6 +30587,7 @@
                     "contract_version": "2026-06-29.1",
                     "economics": {
                       "alpha_in_pool": 0.5,
+                      "alpha_market_cap_tao": 0.5,
                       "alpha_out_pool": 0.5,
                       "alpha_price_tao": 0.5,
                       "block": 5000000,
@@ -36498,7 +36509,7 @@
   ],
   "x-metagraphed": {
     "canonical_artifact_base_path": "/metagraph",
-    "contract_version": "2026-06-30.14",
+    "contract_version": "2026-07-01.1",
     "generated_at": "1970-01-01T00:00:00.000Z",
     "notes": "OpenAPI describes Worker response envelopes and canonical artifact payloads. Raw /metagraph JSON remains the reviewed source contract.",
     "schema_version": 1
