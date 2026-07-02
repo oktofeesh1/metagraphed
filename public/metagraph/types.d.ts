@@ -742,8 +742,25 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Fetch the index of captured live request/response fixtures (which surfaces carry a sanitized sample). Fetch one with get_fixture / GET /metagraph/fixtures/{surface_id}.json. */
+        /** Fetch the index of captured live request/response fixtures (which surfaces carry a sanitized sample). Fetch one with GET /api/v1/fixtures/{surface_id}, get_fixture, or GET /metagraph/fixtures/{surface_id}.json. */
         get: operations["fixtures"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fixtures/{surface_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fetch one captured, sanitized live request/response fixture by surface id. */
+        get: operations["fixtureDetail"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3123,6 +3140,36 @@ export interface components {
             next_cursor?: string | null;
             offset?: number | null;
             schema_version: number;
+        } & {
+            [key: string]: unknown;
+        };
+        /** @description Captured, sanitized live request/response sample for one no-auth GET surface. */
+        FixtureArtifact: {
+            /** Format: date-time */
+            captured_at?: string | null;
+            /** Format: date-time */
+            generated_at?: string;
+            kind: string;
+            netuid: number;
+            request: {
+                method: string;
+                /** Format: uri */
+                url: string;
+            } & {
+                [key: string]: unknown;
+            };
+            response: {
+                /** @description Sanitized JSON response body; sensitive fields and private URLs are redacted before publish. */
+                body: components["schemas"]["JsonObject"] | unknown[] | string | number | boolean | null;
+                content_type?: string | null;
+                status: number;
+            } & {
+                [key: string]: unknown;
+            };
+            schema_version?: number;
+            subnet_name?: string | null;
+            subnet_slug?: string | null;
+            surface_id: string;
         } & {
             [key: string]: unknown;
         };
@@ -11170,6 +11217,125 @@ export interface operations {
                      */
                     "application/json": components["schemas"]["SuccessEnvelope"] & {
                         data?: components["schemas"]["FixturesIndexArtifact"];
+                    };
+                };
+            };
+            /** @description ETag matched and the cached response is still valid. */
+            304: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Query parameters were malformed or unsupported. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Artifact or API route was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description HTTP method is not supported. */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Unexpected backend error. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    fixtureDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                surface_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Canonical artifact wrapped in the Metagraphed API envelope. */
+            200: {
+                headers: {
+                    "cache-control": components["headers"]["CacheControl"];
+                    etag: components["headers"]["ETag"];
+                    "x-metagraph-contract-version": components["headers"]["ContractVersion"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "data": {
+                     *         "captured_at": "2026-06-16T12:00:00.000Z",
+                     *         "generated_at": "1970-01-01T00:00:00.000Z",
+                     *         "kind": "subnet-api",
+                     *         "netuid": 7,
+                     *         "request": {
+                     *           "method": "GET",
+                     *           "url": "https://api.all-ways.io/health"
+                     *         },
+                     *         "response": {
+                     *           "body": {
+                     *             "ok": true
+                     *           },
+                     *           "content_type": "application/json",
+                     *           "status": 200
+                     *         },
+                     *         "schema_version": 1,
+                     *         "subnet_name": "AllWays",
+                     *         "subnet_slug": "allways",
+                     *         "surface_id": "7:subnet-api:new_v2"
+                     *       },
+                     *       "meta": {
+                     *         "artifact_path": "/metagraph/fixtures/7:subnet-api:new_v2.json",
+                     *         "cache": "short",
+                     *         "contract_version": "2026-06-29.1",
+                     *         "generated_at": "2026-06-01T00:00:00.000Z",
+                     *         "pagination": {
+                     *           "collection": "example",
+                     *           "cursor": 1,
+                     *           "limit": 1,
+                     *           "next_cursor": 1,
+                     *           "order": "asc",
+                     *           "returned": 1,
+                     *           "sort": "example",
+                     *           "total": 1
+                     *         },
+                     *         "published_at": "2026-06-01T00:00:00.000Z",
+                     *         "source": "live-cron-prober",
+                     *         "stale_contract": {
+                     *           "built_under": "example",
+                     *           "live": "example"
+                     *         }
+                     *       },
+                     *       "ok": true,
+                     *       "schema_version": 1
+                     *     }
+                     */
+                    "application/json": components["schemas"]["SuccessEnvelope"] & {
+                        data?: components["schemas"]["FixtureArtifact"];
                     };
                 };
             };

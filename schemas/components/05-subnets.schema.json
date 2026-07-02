@@ -3608,6 +3608,51 @@
             "additionalProperties": true
           }
         ]
+      },
+      "FixtureArtifact": {
+        "type": "object",
+        "description": "Captured, sanitized live request/response sample for one no-auth GET surface.",
+        "required": ["surface_id", "netuid", "kind", "request", "response"],
+        "properties": {
+          "schema_version": { "type": "integer", "minimum": 1 },
+          "generated_at": { "type": "string", "format": "date-time" },
+          "surface_id": { "type": "string" },
+          "netuid": { "type": "integer", "minimum": 0 },
+          "subnet_slug": { "type": ["string", "null"] },
+          "subnet_name": { "type": ["string", "null"] },
+          "kind": { "type": "string" },
+          "captured_at": { "type": ["string", "null"], "format": "date-time" },
+          "request": {
+            "type": "object",
+            "required": ["method", "url"],
+            "properties": {
+              "method": { "type": "string" },
+              "url": { "type": "string", "format": "uri" }
+            },
+            "additionalProperties": true
+          },
+          "response": {
+            "type": "object",
+            "required": ["status", "body"],
+            "properties": {
+              "status": { "type": "integer" },
+              "content_type": { "type": ["string", "null"] },
+              "body": {
+                "anyOf": [
+                  { "$ref": "#/components/schemas/JsonObject" },
+                  { "type": "array", "items": {} },
+                  { "type": "string" },
+                  { "type": "number" },
+                  { "type": "boolean" },
+                  { "type": "null" }
+                ],
+                "description": "Sanitized JSON response body; sensitive fields and private URLs are redacted before publish."
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": true
       }
     }
   }

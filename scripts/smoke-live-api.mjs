@@ -22,7 +22,11 @@ if (
 
 async function runLiveSmoke() {
   const healthDate = await discoverHealthHistoryDate();
-  const apiChecks = API_ROUTES.map((route) => ({
+  const fixtureSurfaceId =
+    process.env.METAGRAPH_LIVE_FIXTURE_SURFACE_ID || null;
+  const apiChecks = API_ROUTES.filter(
+    (route) => route.id !== "fixture-detail" || fixtureSurfaceId,
+  ).map((route) => ({
     route: route.path,
     url: apiRouteUrl(route.path, healthDate),
   }));
@@ -384,6 +388,10 @@ export function apiRouteUrl(routePath, date) {
     .replace("{uid}", "0")
     .replace("{hash}", `0x${"0".repeat(64)}`)
     .replace("{ref}", "0")
+    .replace(
+      "{surface_id}",
+      process.env.METAGRAPH_LIVE_FIXTURE_SURFACE_ID || "7:subnet-api:new_v2",
+    )
     .replace("{ss58}", "5C4hrfjw9DjXZTzV3MwzrrAr9P1MJhSrvWGWqi1eSuyUpnhM");
   // Guard against the recurring #1682 class: any leftover `{` means a route
   // placeholder was never substituted, which silently 404s against a live URL
