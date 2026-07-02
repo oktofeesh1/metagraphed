@@ -749,6 +749,112 @@ describe("invalid query handling", () => {
   });
 });
 
+// --- CSV list export ----------------------------------------------------------
+describe("subnets CSV export", () => {
+  test("?format=csv returns text/csv with projected rows", async () => {
+    const res = await handleRequest(
+      req("/api/v1/subnets?format=csv&fields=netuid,name&sort=netuid&limit=2"),
+      createLocalArtifactEnv(),
+      {},
+    );
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get("content-type"), /^text\/csv/);
+    assert.equal(
+      res.headers.get("content-disposition"),
+      'attachment; filename="subnets.csv"',
+    );
+
+    const lines = (await res.text()).split("\r\n");
+    assert.equal(lines[0], "netuid,name");
+    assert.equal(lines.length, 3);
+    assert.match(lines[1], /^\d+,/);
+    assert.match(lines[2], /^\d+,/);
+  });
+
+  test("Accept: text/csv negotiates CSV and honors filters", async () => {
+    const res = await handleRequest(
+      req("/api/v1/subnets?fields=netuid,status&status=active&limit=5", {
+        headers: { accept: "application/json, text/csv" },
+      }),
+      createLocalArtifactEnv(),
+      {},
+    );
+    assert.equal(res.status, 200);
+
+    const lines = (await res.text()).split("\r\n");
+    assert.equal(lines[0], "netuid,status");
+    assert.ok(lines.length > 1);
+    assert.equal(
+      lines.slice(1).every((line) => line.endsWith(",active")),
+      true,
+    );
+  });
+
+  test("?format=json keeps the JSON envelope even when Accept asks for CSV", async () => {
+    const res = await handleRequest(
+      req("/api/v1/subnets?format=json&fields=netuid,name&limit=1", {
+        headers: { accept: "text/csv" },
+      }),
+      createLocalArtifactEnv(),
+      {},
+    );
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get("content-type"), /^application\/json/);
+
+    const body = await res.json();
+    assert.equal(body.ok, true);
+    assert.equal(Array.isArray(body.data.subnets), true);
+    assert.deepEqual(Object.keys(body.data.subnets[0]).sort(), [
+      "name",
+      "netuid",
+    ]);
+  });
+
+  test("Accept: text/csv is ignored for non-collection routes", async () => {
+    const res = await handleRequest(
+      req("/api/v1/subnets/7", {
+        headers: { accept: "text/csv" },
+      }),
+      createLocalArtifactEnv(),
+      {},
+    );
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get("content-type"), /^application\/json/);
+
+    const body = await res.json();
+    assert.equal(body.ok, true);
+    assert.equal(body.data.subnet.netuid, 7);
+  });
+
+  test("malformed list artifacts produce an empty CSV body", async () => {
+    const malformedList = { profiles: [] };
+    const env = createLocalArtifactEnv({
+      ASSETS: {
+        async fetch() {
+          return Response.json(malformedList);
+        },
+      },
+      METAGRAPH_ARCHIVE: {
+        async get() {
+          return {
+            async json() {
+              return malformedList;
+            },
+            async text() {
+              return JSON.stringify(malformedList);
+            },
+          };
+        },
+      },
+    });
+
+    const res = await handleRequest(req("/api/v1/subnets?format=csv"), env, {});
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get("content-type"), /^text\/csv/);
+    assert.equal(await res.text(), "");
+  });
+});
+
 // --- RFC 8288 pagination Link header (#1686) ----------------------------------
 // /api/v1/subnets is the only end-to-end list fixture; the header is built once
 // for every cursor-paginated collection in workers/list-query.mjs, so proving it

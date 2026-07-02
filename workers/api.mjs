@@ -9,6 +9,7 @@ import {
   canonicalListSearch,
   paginationLinkHeader,
 } from "./list-query.mjs";
+import { csvRequested, csvResponse } from "./csv.mjs";
 import {
   apiHeaders,
   errorResponse,
@@ -2330,6 +2331,8 @@ async function handleApiRequest(
   if (!matched) {
     return errorResponse("not_found", "No API route matched this path.", 404);
   }
+  const wantsCsv =
+    Boolean(matched.queryCollection) && csvRequested(url, request);
   // Edge-cache idempotent GETs for pure static-artifact routes (mirrors the
   // RPC-proxy Cache API pattern). Live-overlay routes are excluded by route id,
   // not by whether live data happened to be available for this request, so cold
@@ -2338,7 +2341,9 @@ async function handleApiRequest(
   // switch can never serve a cross-version body; the response's own
   // cache-control max-age bounds staleness.
   const edgeCache =
-    request.method === "GET" && isStaticEdgeCacheEligible(matched, network)
+    request.method === "GET" &&
+    !wantsCsv &&
+    isStaticEdgeCacheEligible(matched, network)
       ? globalThis.caches?.default
       : null;
   const edgeCacheKey = edgeCache
@@ -2355,6 +2360,7 @@ async function handleApiRequest(
   // + SHA-256 into at-most-once-per-cron-tick, staleness bounded to one interval.
   const overlayCache =
     request.method === "GET" &&
+    !wantsCsv &&
     network.isDefault &&
     CACHEABLE_OVERLAY_ROUTE_IDS.has(matched.id)
       ? globalThis.caches?.default
@@ -2560,6 +2566,13 @@ async function handleApiRequest(
       artifact_path: artifactPath,
       parameter: transformed.error.parameter,
     });
+  }
+  if (wantsCsv) {
+    const collectionKey = transformed.meta.pagination?.collection;
+    const rows = Array.isArray(transformed.data?.[collectionKey])
+      ? transformed.data[collectionKey]
+      : [];
+    return csvResponse(rows, matched.id, matched.cache, request);
   }
   // Real publish time from the KV latest pointer (null until a publish has
   // populated it). Unlike generated_at — a deterministic content marker that is
